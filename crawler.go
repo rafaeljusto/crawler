@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"code.google.com/p/go.net/html"
@@ -6,10 +6,23 @@ import (
 )
 
 var (
-	// visitedPages store all pages already visited in a map indexed by the page URL to allow a fast
-	// detection of what page was already visited
-	visitedPages map[string]Page
+	// visitedPages store all pages already visited
+	visitedPages []string
+
+	// pagesToVisit store all the pages that need to be analyzed yet
+	pagesToVisit chan *Page
 )
+
+func init() {
+	// We will keep a waiting list in the channel with the size of the number of go routines
+	// processing the pages
+	pagesToVisit = make(chan *Page, 10)
+}
+
+// Crawl check all pages of the URL managing go routines
+func Crawl(url string, fetcher Fetcher) (Page, error) {
+	return crawlPage(url, fetcher)
+}
 
 // crawlPage fetch the URL data and try to retrieve all the information from the page. On error a
 // dummy Page struct is returned. We are not using pointer on page objects because we want them to
@@ -46,7 +59,9 @@ func parseHTML(node *html.Node, page *Page) {
 						URL: attr.Val,
 					}
 
-					// TODO: Add pointer of the created page to pages to visit (if not yet visited)
+					// TODO: Add pointer of the created page to pages to visit only if not yet visited and is
+					// inside the same domain
+					//pagesToVisit <- &link.Page
 					break
 				}
 			}
@@ -90,9 +105,4 @@ func parseHTML(node *html.Node, page *Page) {
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		parseHTML(child, page)
 	}
-}
-
-// main will control the flow of all go routines that retrieve each crawler
-func main() {
-
 }

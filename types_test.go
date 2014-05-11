@@ -1,4 +1,4 @@
-package main
+package crawler
 
 import (
 	"testing"
@@ -25,7 +25,7 @@ func TestPageString(t *testing.T) {
 	}
 
 	expected := `
-❆ URL index.html
+❆ index.html
 
   ▤  example.css
   ▤  example.js
@@ -33,11 +33,11 @@ func TestPageString(t *testing.T) {
 
   ↳ "Example 1"
   
-    ❆ URL example1.html
+    ❆ example1.html
     
   ↳ "Example 2"
   
-    ❆ URL example2.html
+    ❆ example2.html
     
 `
 
