@@ -20,7 +20,6 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 	testData := []struct {
 		url          string
 		data         string
-		expectedErr  error
 		expectedPage Page
 	}{
 		{
@@ -30,7 +29,6 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
     <a href="example.net">Example</a>
   </body>
 </html>`,
-			expectedErr: nil,
 			expectedPage: Page{
 				URL: "example.com",
 				Links: []string{
@@ -45,7 +43,6 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
     <A HREF="example.net">Example</A>
   </body>
 </html>`,
-			expectedErr: nil,
 			expectedPage: Page{
 				URL: "example.com",
 				Links: []string{
@@ -60,9 +57,8 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 			return strings.NewReader(testItem.data), nil
 		}))
 
-		if testItem.expectedErr != err {
-			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
-				testItem.expectedErr, err)
+		if err != nil {
+			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'", nil, err)
 		}
 
 		if !reflect.DeepEqual(testItem.expectedPage, page) {
