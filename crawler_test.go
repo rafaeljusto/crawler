@@ -16,44 +16,102 @@ func (f FakeFetcher) Fetch(url string) (io.Reader, error) {
 	return f(url)
 }
 
-func TestCrawlMustReturnPageWithInformation(t *testing.T) {
+func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 	testData := []struct {
-		url          string
-		data         string
-		expectedPage Page
+		url      string
+		data     string
+		expected Page
 	}{
+		// Lower case test
 		{
 			url: "example.com",
 			data: `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
   <body>
     <a href="example.net">Example</a>
+    <img src="example.png" alt="example"/>
+    <script type="text/javascript" src="example.js"/>
   </body>
 </html>`,
-			expectedPage: Page{
+			expected: Page{
 				URL: "example.com",
-				Links: []string{
-					"example.net",
+				Links: []Link{
+					{
+						Label: "Example",
+						Page:  Page{URL: "example.net"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
 				},
 			},
 		},
+
+		// Upper case test
 		{
 			url: "example.com",
 			data: `<html>
+  <head>
+    <LINK rel="stylesheet" type="text/css" HREF="example.css">
+  </head>
   <body>
     <A HREF="example.net">Example</A>
+    <IMG SRC="example.png" alt="example"/>
+    <SCRIPT type="text/javascript" SRC="example.js"/>
   </body>
 </html>`,
-			expectedPage: Page{
+			expected: Page{
 				URL: "example.com",
-				Links: []string{
-					"example.net",
+				Links: []Link{
+					{
+						Label: "Example",
+						Page:  Page{URL: "example.net"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
+
+		// No end-tag test
+		{
+			url: "example.com",
+			data: `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>      
+  <body>
+    <a href="example.net">Example
+    <img src="example.png" alt="example">
+    <script type="text/javascript" src="example.js">
+  </body>
+</html>`,
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "Example",
+						Page:  Page{URL: "example.net"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
 				},
 			},
 		},
 	}
 
 	for _, testItem := range testData {
-		page, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		page, err := crawlPage(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), nil
 		}))
 
@@ -61,34 +119,34 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'", nil, err)
 		}
 
-		if !reflect.DeepEqual(testItem.expectedPage, page) {
+		if !reflect.DeepEqual(testItem.expected, page) {
 			t.Errorf("Unexpected page returned. Expected '%#v' and got '%#v'",
-				testItem.expectedPage, page)
+				testItem.expected, page)
 		}
 	}
 }
 
-func TestCrawlMustReturnErrorOnFetchProblems(t *testing.T) {
+func TestCrawlPageMustReturnErrorOnFetchProblems(t *testing.T) {
 	testData := []struct {
-		url         string
-		data        string
-		expectedErr error
+		url      string
+		data     string
+		expected error
 	}{
 		{
-			url:         "example.com",
-			data:        "",
-			expectedErr: http.ErrContentLength,
+			url:      "example.com",
+			data:     "",
+			expected: http.ErrContentLength,
 		},
 	}
 
 	for _, testItem := range testData {
-		_, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		_, err := crawlPage(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), http.ErrContentLength
 		}))
 
-		if testItem.expectedErr != err {
+		if testItem.expected != err {
 			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
-				testItem.expectedErr, err)
+				testItem.expected, err)
 		}
 	}
 }
