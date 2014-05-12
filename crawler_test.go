@@ -86,7 +86,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 			data: `<html>
   <head>
     <link rel="stylesheet" type="text/css" href="example.css">
-  </head>      
+  </head>
   <body>
     <a href="example.net">Example
     <img src="example.png" alt="example">
@@ -111,7 +111,11 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 	}
 
 	for _, testItem := range testData {
-		page, err := crawlPage(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		page := Page{
+			URL: testItem.url,
+		}
+
+		err := crawlPage(&page, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), nil
 		}))
 
@@ -140,7 +144,11 @@ func TestCrawlPageMustReturnErrorOnFetchProblems(t *testing.T) {
 	}
 
 	for _, testItem := range testData {
-		_, err := crawlPage(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		page := Page{
+			URL: testItem.url,
+		}
+
+		err := crawlPage(&page, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), http.ErrContentLength
 		}))
 

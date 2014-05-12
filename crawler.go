@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+const (
+	// spiders defines the number of go routines that will analyze the pages
+	spiders = 10
+)
+
 var (
 	// visitedPages store all pages already visited
 	visitedPages []string
@@ -16,34 +21,42 @@ var (
 func init() {
 	// We will keep a waiting list in the channel with the size of the number of go routines
 	// processing the pages
-	pagesToVisit = make(chan *Page, 10)
+	pagesToVisit = make(chan *Page, spiders)
 }
 
 // Crawl check all pages of the URL managing go routines
 func Crawl(url string, fetcher Fetcher) (Page, error) {
-	return crawlPage(url, fetcher)
-}
-
-// crawlPage fetch the URL data and try to retrieve all the information from the page. On error a
-// dummy Page struct is returned. We are not using pointer on page objects because we want them to
-// be destroyed as soon as possible
-func crawlPage(url string, fetcher Fetcher) (Page, error) {
-	page := Page{
+	rootPage := Page{
 		URL: url,
 	}
+	pagesToVisit <- &rootPage
 
-	r, err := fetcher.Fetch(url)
+	for i := 0; i < spiders; i++ {
+		go func() {
+			for page := range pagesToVisit {
+				crawlPage(page, fetcher)
+			}
+		}()
+	}
+
+	return rootPage, nil
+}
+
+// crawlPage fetch the URL data and try to retrieve all the information from the page,
+// filling the page pointer on successful return
+func crawlPage(page *Page, fetcher Fetcher) error {
+	r, err := fetcher.Fetch(page.URL)
 	if err != nil {
-		return page, err
+		return err
 	}
 
 	root, err := html.Parse(r)
 	if err != nil {
-		return page, err
+		return err
 	}
 
-	parseHTML(root, &page)
-	return page, nil
+	parseHTML(root, page)
+	return nil
 }
 
 // parseHTML is an auxiliary function of Crawl function that will travel recursively around the HTML
