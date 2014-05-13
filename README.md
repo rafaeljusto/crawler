@@ -13,3 +13,14 @@ The Crawler project was developed using the Go language and it depends on the fo
 All the above packages can be installed using the command:
 
     go get -u <package_name>
+
+Also, to easy run the project tests you will need the following:
+
+* Python3 - http://www.python.org/
+
+deploying
+=========
+
+To deploy the project you will need the program bellow.
+
+* FPM - https://github.com/jordansissel/fpm (Debian packages)
