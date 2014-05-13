@@ -120,9 +120,9 @@ func (c *CrawlerContext) VisitPage(page *Page) {
 }
 
 // URLWasVisited is a go routine safe way to check if a page was alredy analyzed
-func (c *CrawlerContext) URLWasVisited(url string) (*Page, bool) {
+func (c *CrawlerContext) URLWasVisited(url string) bool {
 	c.visitedPagesLock.RLock()
 	defer c.visitedPagesLock.RUnlock()
-	page, visited := c.visitedPages[url]
-	return page, visited
+	_, visited := c.visitedPages[url]
+	return visited
 }

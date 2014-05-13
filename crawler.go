@@ -72,26 +72,20 @@ func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 					linkURL = context.Domain + "/" + linkURL
 				}
 
-				// Check if we already processed this page, if so add the pointer of the page, otherwise
-				// set the page to be processed if is in the same domain
-				if strings.HasPrefix(linkURL, context.Domain) {
-					if p, found := context.URLWasVisited(linkURL); found {
-						link.Page = p
+				link.Page = &Page{
+					URL: linkURL,
+				}
 
-					} else {
-						link.Page = &Page{
-							URL: linkURL,
-						}
-
-						context.WG.Add(1)
-						go crawlPage(context, link.Page)
-					}
-
-				} else {
-					// Outside the domain
+				// Check if we already processed this page, to avoid a cyclic recursion when
+				// showing the results we aren't going to add a reference for the already analyzed
+				// page
+				if strings.HasPrefix(linkURL, context.Domain) && !context.URLWasVisited(linkURL) {
 					link.Page = &Page{
 						URL: linkURL,
 					}
+
+					context.WG.Add(1)
+					go crawlPage(context, link.Page)
 				}
 
 				// TODO: Not checking when the link has a relative path
