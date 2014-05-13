@@ -97,7 +97,7 @@ type CrawlerContext struct {
 	visitedPages map[string]*Page
 
 	// visitedPagesLock allows visitedPages to be manipulated safely by go routines
-	visitedPagesLock sync.Mutex
+	visitedPagesLock sync.RWMutex
 }
 
 // NewCrawlerContext make it easy to initialize a new context
@@ -121,9 +121,8 @@ func (c *CrawlerContext) VisitPage(page *Page) {
 
 // URLWasVisited is a go routine safe way to check if a page was alredy analyzed
 func (c *CrawlerContext) URLWasVisited(url string) (*Page, bool) {
-	c.visitedPagesLock.Lock()
-	defer c.visitedPagesLock.Unlock()
-
+	c.visitedPagesLock.RLock()
+	defer c.visitedPagesLock.RUnlock()
 	page, visited := c.visitedPages[url]
 	return page, visited
 }
