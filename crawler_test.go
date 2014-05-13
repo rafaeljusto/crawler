@@ -40,7 +40,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  Page{URL: "example.net"},
+						Page:  &Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{
@@ -69,7 +69,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  Page{URL: "example.net"},
+						Page:  &Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{
@@ -98,7 +98,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  Page{URL: "example.net"},
+						Page:  &Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{

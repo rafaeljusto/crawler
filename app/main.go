@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rafaeljusto/crawler"
 	"os"
+	"runtime"
 )
 
 // List of possible return codes of the program
@@ -16,6 +17,8 @@ const (
 
 // main will control the flow of all go routines that retrieve each crawler
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	var url string
 	flag.StringVar(&url, "url", "", "URL to build the site map")
 	flag.StringVar(&url, "u", "", "URL to build the site map")

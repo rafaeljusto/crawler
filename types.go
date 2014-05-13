@@ -31,8 +31,12 @@ func (p Page) String() string {
 			links += "\n"
 		}
 
-		// Add identation for the current level
-		linkPage := strings.Replace(link.Page.String(), "\n", "\n    ", -1)
+		// Check if link page is nil, because we don't analyze pages that are out of the initial domain
+		linkPage := ""
+		if link.Page != nil {
+			// Add identation for the current level
+			linkPage = strings.Replace(link.Page.String(), "\n", "\n    ", -1)
+		}
 
 		links += fmt.Sprintf(`  ↳ "%s"
   %s`, link.Label, linkPage)
@@ -56,7 +60,7 @@ func (p Page) String() string {
 // Link stores information of other URL in this page
 type Link struct {
 	Label string // Context identification of the link
-	Page  Page   // Page information about the other URL
+	Page  *Page  // Page information about the other URL
 }
 
 // Fetcher creates an interface to allow a flexibility on how we retrieve the page data. For tests

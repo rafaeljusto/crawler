@@ -3,6 +3,7 @@ package crawler
 import (
 	"code.google.com/p/go.net/html"
 	"strings"
+	"sync"
 )
 
 const (
@@ -11,35 +12,92 @@ const (
 )
 
 var (
-	// visitedPages store all pages already visited
-	visitedPages []string
+	// visitedPages store all pages already visited in a map, so that if we found a link for the same
+	// page again, we just pick on the map the same object address. The function that prints the page
+	// is responsable for detecting cycle loops
+	visitedPages map[string]*Page
+
+	// visitedPagesLock allows visitedPages to be manipulated safely by go routines
+	visitedPagesLock sync.Mutex
 
 	// pagesToVisit store all the pages that need to be analyzed yet
 	pagesToVisit chan *Page
+
+	// domain defines the pages that are going to be analyzed
+	domain string
 )
 
 func init() {
+	visitedPages = make(map[string]*Page)
+
 	// We will keep a waiting list in the channel with the size of the number of go routines
 	// processing the pages
 	pagesToVisit = make(chan *Page, spiders)
 }
 
 // Crawl check all pages of the URL managing go routines
-func Crawl(url string, fetcher Fetcher) (Page, error) {
-	rootPage := Page{
+func Crawl(url string, fetcher Fetcher) (*Page, error) {
+	domain = url
+
+	rootPage := &Page{
 		URL: url,
 	}
-	pagesToVisit <- &rootPage
+
+	done := make(chan bool)
+	processing := make(chan bool)
+	err := make(chan error)
 
 	for i := 0; i < spiders; i++ {
-		go func() {
-			for page := range pagesToVisit {
-				crawlPage(page, fetcher)
-			}
-		}()
+		go crawlAnalyzer(done, processing, err, fetcher)
+	}
+
+	pagesToVisit <- rootPage
+	working := 0
+
+	for {
+		select {
+		case <-processing:
+			working += 1
+
+		case <-done:
+			working -= 1
+
+		case e := <-err:
+			close(pagesToVisit)
+			return nil, e
+		}
+
+		// When there's only one spider this approach could be a problem, because it can exit before
+		// analyzing all the pages from the pagesToVisit channel
+		if working == 0 {
+			close(pagesToVisit)
+			break
+		}
 	}
 
 	return rootPage, nil
+}
+
+// crawlAnalyzer represents the go routine tasks, it will use done and processing channels to alert
+// the go routines manager when we are done. If no go routine is working, so there's no more pages
+// to analyze
+func crawlAnalyzer(done, processing chan bool, err chan error, fetcher Fetcher) {
+	for {
+		page, ok := <-pagesToVisit
+		if !ok {
+			return
+		}
+
+		processing <- true
+		if e := crawlPage(page, fetcher); e != nil {
+			err <- e
+		}
+		done <- true
+
+		visitedPagesLock.Lock()
+		visitedPages[page.URL] = page
+		visitedPagesLock.Unlock()
+	}
 }
 
 // crawlPage fetch the URL data and try to retrieve all the information from the page,
@@ -68,13 +126,26 @@ func parseHTML(node *html.Node, page *Page) {
 			var link Link
 			for _, attr := range node.Attr {
 				if attr.Key == "href" {
-					link.Page = Page{
-						URL: attr.Val,
+					// Check if we already processed this page, if so add the pointer of the page, otherwise
+					// set the page to be processed if is in the same domain (or the link is relative)
+					if p, found := visitedPages[attr.Val]; found {
+						link.Page = p
+
+					} else if strings.HasPrefix(attr.Val, domain) {
+						link.Page = &Page{
+							URL: attr.Val,
+						}
+
+						pagesToVisit <- link.Page
+
+					} else if !strings.HasPrefix(attr.Val, "http") {
+						link.Page = &Page{
+							URL: domain + "/" + attr.Val,
+						}
+
+						pagesToVisit <- link.Page
 					}
 
-					// TODO: Add pointer of the created page to pages to visit only if not yet visited and is
-					// inside the same domain
-					//pagesToVisit <- &link.Page
 					break
 				}
 			}
