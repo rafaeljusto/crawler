@@ -40,7 +40,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  &Page{URL: "example.net"},
+						Page:  Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{
@@ -69,7 +69,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  &Page{URL: "example.net"},
+						Page:  Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{
@@ -98,7 +98,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 				Links: []Link{
 					{
 						Label: "Example",
-						Page:  &Page{URL: "example.net"},
+						Page:  Page{URL: "example.net"},
 					},
 				},
 				StaticAssets: []string{
@@ -111,32 +111,15 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 	}
 
 	for _, testItem := range testData {
-		page := Page{
-			URL: testItem.url,
-		}
-
-		context := NewCrawlerContext(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		page, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), nil
 		}))
 
-		context.WG.Add(1)
-		go crawlPage(context, &page)
-
-		done := make(chan bool)
-		go func() {
-			context.WG.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// Everything worked fine
-
-		case err := <-context.Fail:
+		if err != nil {
 			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'", nil, err)
 		}
 
-		if !reflect.DeepEqual(testItem.expected, page) {
+		if !reflect.DeepEqual(testItem.expected, *page) {
 			t.Errorf("Unexpected page returned. Expected '%#v' and got '%#v'",
 				testItem.expected, page)
 		}
@@ -157,36 +140,13 @@ func TestCrawlPageMustReturnErrorOnFetchProblems(t *testing.T) {
 	}
 
 	for _, testItem := range testData {
-		page := Page{
-			URL: testItem.url,
-		}
-
-		context := NewCrawlerContext(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		_, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), http.ErrContentLength
 		}))
 
-		context.WG.Add(1)
-		go crawlPage(context, &page)
-
-		done := make(chan bool)
-		go func() {
-			context.WG.Wait()
-			close(done)
-		}()
-
-		select {
-		case <-done:
-			// Everything worked fine
-			if testItem.expected != nil {
-				t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
-					testItem.expected, nil)
-			}
-
-		case err := <-context.Fail:
-			if testItem.expected != err {
-				t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
-					testItem.expected, err)
-			}
+		if testItem.expected != err {
+			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
+				testItem.expected, err)
 		}
 	}
 }

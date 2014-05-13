@@ -1,8 +1,10 @@
 package crawler
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
@@ -32,12 +34,8 @@ func (p Page) String() string {
 			links += "\n"
 		}
 
-		// Check if link page is nil, because we don't analyze pages that are out of the initial domain
-		linkPage := ""
-		if link.Page != nil {
-			// Add identation for the current level
-			linkPage = strings.Replace(link.Page.String(), "\n", "\n    ", -1)
-		}
+		// Add an identation level to the link content
+		linkPage := strings.Replace(link.Page.String(), "\n", "\n    ", -1)
 
 		links += fmt.Sprintf(`  ↳ "%s"
   %s`, link.Label, linkPage)
@@ -61,7 +59,7 @@ func (p Page) String() string {
 // Link stores information of other URL in this page
 type Link struct {
 	Label string // Context identification of the link
-	Page  *Page  // Page information about the other URL
+	Page  Page   // Page information about the other URL
 }
 
 // Fetcher creates an interface to allow a flexibility on how we retrieve the page data. For tests
@@ -79,9 +77,14 @@ func (f HTTPFetcher) Fetch(url string) (io.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer response.Body.Close()
 
-	// TODO: Close the body
-	return response.Body, nil
+	content, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.NewReader(content), nil
 }
 
 // CrawlerContext stores all attributes used during a crawling execution
