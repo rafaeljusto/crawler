@@ -3,22 +3,7 @@ package crawler
 import (
 	"code.google.com/p/go.net/html"
 	"strings"
-	"sync"
 )
-
-var (
-	// visitedPages store all pages already visited in a map, so that if we found a link for the same
-	// page again, we just pick on the map the same object address. The function that prints the page
-	// is responsable for detecting cycle loops
-	visitedPages map[string]*Page
-
-	// visitedPagesLock allows visitedPages to be manipulated safely by go routines
-	visitedPagesLock sync.Mutex
-)
-
-func init() {
-	visitedPages = make(map[string]*Page)
-}
 
 // Crawl check all pages of the URL managing go routines
 func Crawl(url string, fetcher Fetcher) (*Page, error) {
@@ -26,15 +11,14 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 		URL: url,
 	}
 
-	var wg sync.WaitGroup
-	fail := make(chan error)
+	context := NewCrawlerContext(url, fetcher)
 
-	wg.Add(1)
-	go crawlPage(url, page, fetcher, &wg, fail)
+	context.WG.Add(1)
+	go crawlPage(context, page)
 
 	done := make(chan bool)
 	go func() {
-		wg.Wait()
+		context.WG.Wait()
 		close(done)
 	}()
 
@@ -42,7 +26,7 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 	case <-done:
 		// Everything worked fine
 
-	case err := <-fail:
+	case err := <-context.Fail:
 		return nil, err
 	}
 
@@ -51,31 +35,29 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 
 // Crawl fetch the URL data and try to retrieve all the information from the page,
 // filling the page pointer on successful return
-func crawlPage(url string, page *Page, fetcher Fetcher, wg *sync.WaitGroup, fail chan error) {
-	defer wg.Done()
+func crawlPage(context *CrawlerContext, page *Page) {
+	defer context.WG.Done()
 
-	visitedPagesLock.Lock()
-	visitedPages[page.URL] = page
-	visitedPagesLock.Unlock()
+	context.VisitPage(page)
 
-	r, err := fetcher.Fetch(page.URL)
+	r, err := context.Fetcher.Fetch(page.URL)
 	if err != nil {
-		fail <- err
+		context.Fail <- err
 		return
 	}
 
 	root, err := html.Parse(r)
 	if err != nil {
-		fail <- err
+		context.Fail <- err
 		return
 	}
 
-	parseHTML(url, root, page, fetcher, wg, fail)
+	parseHTML(context, root, page)
 }
 
 // parseHTML is an auxiliary function of Crawl function that will travel recursively around the HTML
 // document identifying elements to populate the Page object
-func parseHTML(url string, node *html.Node, page *Page, fetcher Fetcher, wg *sync.WaitGroup, fail chan error) {
+func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 	if node.Type == html.ElementNode {
 		switch node.Data {
 		case "a":
@@ -87,13 +69,13 @@ func parseHTML(url string, node *html.Node, page *Page, fetcher Fetcher, wg *syn
 
 				linkURL := strings.TrimSpace(attr.Val)
 				if strings.HasPrefix(linkURL, "/") {
-					linkURL = url + "/" + linkURL
+					linkURL = context.Domain + "/" + linkURL
 				}
 
 				// Check if we already processed this page, if so add the pointer of the page, otherwise
 				// set the page to be processed if is in the same domain
-				if strings.HasPrefix(linkURL, url) {
-					if p, found := visitedPages[linkURL]; found {
+				if strings.HasPrefix(linkURL, context.Domain) {
+					if p, found := context.URLWasVisited(linkURL); found {
 						link.Page = p
 
 					} else {
@@ -101,8 +83,8 @@ func parseHTML(url string, node *html.Node, page *Page, fetcher Fetcher, wg *syn
 							URL: linkURL,
 						}
 
-						wg.Add(1)
-						go crawlPage(url, link.Page, fetcher, wg, fail)
+						context.WG.Add(1)
+						go crawlPage(context, link.Page)
 					}
 
 				} else {
@@ -155,6 +137,6 @@ func parseHTML(url string, node *html.Node, page *Page, fetcher Fetcher, wg *syn
 	}
 
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		parseHTML(url, child, page, fetcher, wg, fail)
+		parseHTML(context, child, page)
 	}
 }

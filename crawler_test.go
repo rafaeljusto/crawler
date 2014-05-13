@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 )
 
@@ -116,17 +115,16 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 			URL: testItem.url,
 		}
 
-		var wg sync.WaitGroup
-		fail := make(chan error)
-
-		wg.Add(1)
-		go crawlPage(testItem.url, &page, FakeFetcher(func(url string) (io.Reader, error) {
+		context := NewCrawlerContext(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), nil
-		}), &wg, fail)
+		}))
+
+		context.WG.Add(1)
+		go crawlPage(context, &page)
 
 		done := make(chan bool)
 		go func() {
-			wg.Wait()
+			context.WG.Wait()
 			close(done)
 		}()
 
@@ -134,7 +132,7 @@ func TestCrawlPageMustReturnPageWithInformation(t *testing.T) {
 		case <-done:
 			// Everything worked fine
 
-		case err := <-fail:
+		case err := <-context.Fail:
 			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'", nil, err)
 		}
 
@@ -163,17 +161,16 @@ func TestCrawlPageMustReturnErrorOnFetchProblems(t *testing.T) {
 			URL: testItem.url,
 		}
 
-		var wg sync.WaitGroup
-		fail := make(chan error)
-
-		wg.Add(1)
-		go crawlPage(testItem.url, &page, FakeFetcher(func(url string) (io.Reader, error) {
+		context := NewCrawlerContext(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), http.ErrContentLength
-		}), &wg, fail)
+		}))
+
+		context.WG.Add(1)
+		go crawlPage(context, &page)
 
 		done := make(chan bool)
 		go func() {
-			wg.Wait()
+			context.WG.Wait()
 			close(done)
 		}()
 
@@ -185,7 +182,7 @@ func TestCrawlPageMustReturnErrorOnFetchProblems(t *testing.T) {
 					testItem.expected, nil)
 			}
 
-		case err := <-fail:
+		case err := <-context.Fail:
 			if testItem.expected != err {
 				t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
 					testItem.expected, err)

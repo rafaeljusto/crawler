@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 // Page describes the information stored after a webpage is crawled
@@ -79,6 +80,50 @@ func (f HTTPFetcher) Fetch(url string) (io.Reader, error) {
 		return nil, err
 	}
 
-	// TODO: Close the body?
+	// TODO: Close the body
 	return response.Body, nil
+}
+
+// CrawlerContext stores all attributes used during a crawling execution
+type CrawlerContext struct {
+	Domain  string
+	Fetcher Fetcher
+	WG      sync.WaitGroup
+	Fail    chan error
+
+	// visitedPages store all pages already visited in a map, so that if we found a link for the same
+	// page again, we just pick on the map the same object address. The function that prints the page
+	// is responsable for detecting cycle loops
+	visitedPages map[string]*Page
+
+	// visitedPagesLock allows visitedPages to be manipulated safely by go routines
+	visitedPagesLock sync.Mutex
+}
+
+// NewCrawlerContext make it easy to initialize a new context
+func NewCrawlerContext(domain string, fetcher Fetcher) *CrawlerContext {
+	c := &CrawlerContext{
+		Domain:  domain,
+		Fetcher: fetcher,
+	}
+
+	c.Fail = make(chan error)
+	c.visitedPages = make(map[string]*Page)
+	return c
+}
+
+// VisitPage is a go routine safe way to add a new item in the visitedPages map
+func (c *CrawlerContext) VisitPage(page *Page) {
+	c.visitedPagesLock.Lock()
+	defer c.visitedPagesLock.Unlock()
+	c.visitedPages[page.URL] = page
+}
+
+// URLWasVisited is a go routine safe way to check if a page was alredy analyzed
+func (c *CrawlerContext) URLWasVisited(url string) (*Page, bool) {
+	c.visitedPagesLock.Lock()
+	defer c.visitedPagesLock.Unlock()
+
+	page, visited := c.visitedPages[url]
+	return page, visited
 }
