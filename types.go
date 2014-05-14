@@ -11,6 +11,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 )
@@ -39,8 +40,19 @@ func (p Page) String() string {
 			links += "\n"
 		}
 
-		// Add an identation level to the link content
-		linkPage := strings.Replace(link.Page.String(), "\n", "\n    ", -1)
+		linkPage := ""
+
+		// Check for nil pointer because there can be links without href (anchors)
+		if link.Page != nil {
+			if link.CyclicPage {
+				// Don't print already visited pages to avoid infinite recursion
+				linkPage = fmt.Sprintf("\n    ❆ %s ↺\n", link.Page.URL)
+
+			} else {
+				// Add an identation level to the link content
+				linkPage = strings.Replace(link.Page.String(), "\n", "\n    ", -1)
+			}
+		}
 
 		links += fmt.Sprintf(`  ↳ "%s"
   %s`, link.Label, linkPage)
@@ -61,10 +73,37 @@ func (p Page) String() string {
 	return pageStr
 }
 
+// Equal compares a pair os pages to see if they are equal. This method has an special
+// behaviour because it does not compare pointers of the link's page, instead, compare
+// their content, it also does not compare when is a link cyclic page, to avoid infinite
+// recursion
+func (p Page) Equal(other Page) bool {
+	if p.URL != other.URL ||
+		!reflect.DeepEqual(p.StaticAssets, other.StaticAssets) ||
+		len(p.Links) != len(other.Links) {
+		return false
+	}
+
+	for i := 0; i < len(p.Links); i++ {
+		if p.Links[i].Label != other.Links[i].Label ||
+			p.Links[i].CyclicPage != other.Links[i].CyclicPage {
+			return false
+		}
+
+		// Don't check again when the page was already verified
+		if !p.Links[i].CyclicPage && !p.Links[i].Page.Equal(*other.Links[i].Page) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Link stores information of other URL in this page
 type Link struct {
-	Label string // Context identification of the link
-	Page  Page   // Page information about the other URL
+	Label      string // Context identification of the link
+	Page       *Page  // Page information about the other URL
+	CyclicPage bool   // Flag to indicate if this page was already processed
 }
 
 // Fetcher creates an interface to allow a flexibility on how we retrieve the page data. For tests
@@ -128,9 +167,9 @@ func (c *CrawlerContext) VisitPage(page *Page) {
 }
 
 // URLWasVisited is a go routine safe way to check if a page was alredy analyzed
-func (c *CrawlerContext) URLWasVisited(url string) bool {
+func (c *CrawlerContext) URLWasVisited(url string) (*Page, bool) {
 	c.visitedPagesLock.RLock()
 	defer c.visitedPagesLock.RUnlock()
-	_, visited := c.visitedPages[url]
-	return visited
+	page, visited := c.visitedPages[url]
+	return page, visited
 }

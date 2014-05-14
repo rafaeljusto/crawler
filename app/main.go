@@ -48,6 +48,7 @@ func main() {
 		os.Exit(ErrInputParameters)
 	}
 
+	fmt.Println("Analyzing domain...")
 	page, err := crawler.Crawl(url, crawler.HTTPFetcher{})
 	if err != nil {
 		fmt.Println(err)
@@ -64,9 +65,11 @@ func main() {
 ┃ ❆ Page               ┃
 ┃ ↳ Link               ┃
 ┃ ▤ Static Asset       ┃
+┃ ↺ Already visited    ┃
 ┃                      ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━┛
 `, url)
 
+	fmt.Println("Building output...")
 	fmt.Println(page)
 }

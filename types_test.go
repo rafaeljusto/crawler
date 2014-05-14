@@ -15,11 +15,11 @@ func TestPageString(t *testing.T) {
 		Links: []Link{
 			{
 				Label: "Example 1",
-				Page:  Page{URL: "example1.html"},
+				Page:  &Page{URL: "example1.html"},
 			},
 			{
 				Label: "Example 2",
-				Page:  Page{URL: "example2.html"},
+				Page:  &Page{URL: "example2.html"},
 			},
 		},
 		StaticAssets: []string{

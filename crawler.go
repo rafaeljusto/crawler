@@ -77,16 +77,22 @@ func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 					linkURL = context.Domain + "/" + linkURL
 				}
 
-				link.Page = Page{
-					URL: linkURL,
-				}
-
 				// Check if we already processed this page, to avoid a cyclic recursion when
 				// showing the results we aren't going to add a reference for the already analyzed
 				// page
-				if strings.HasPrefix(linkURL, context.Domain) && !context.URLWasVisited(linkURL) {
-					context.WG.Add(1)
-					go crawlPage(context, &link.Page)
+				if page, visited := context.URLWasVisited(linkURL); visited {
+					link.Page = page
+					link.CyclicPage = true
+
+				} else {
+					link.Page = &Page{
+						URL: linkURL,
+					}
+
+					if strings.HasPrefix(linkURL, context.Domain) {
+						context.WG.Add(1)
+						go crawlPage(context, link.Page)
+					}
 				}
 
 				// TODO: Not checking when the link has a relative path
@@ -111,6 +117,10 @@ func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 					link.Label += "\n"
 				}
 				link.Label += data
+			}
+
+			if len(link.Label) == 0 {
+				link.Label = "<no label>"
 			}
 
 			page.Links = append(page.Links, link)
