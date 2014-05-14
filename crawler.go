@@ -74,7 +74,7 @@ func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 
 				linkURL := strings.TrimSpace(attr.Val)
 				if strings.HasPrefix(linkURL, "/") {
-					linkURL = context.Domain + "/" + linkURL
+					linkURL = context.Domain + linkURL
 				}
 
 				// Check if we already processed this page, to avoid a cyclic recursion when

@@ -112,6 +112,93 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 				},
 			},
 		},
+
+		// No href test
+		{
+			url: "example.com",
+			data: `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
+  <body>
+    <a id="example">Example</a>
+    <img src="example.png" alt="example">
+    <script type="text/javascript" src="example.js">
+  </body>
+</html>`,
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "Example",
+						Page:  nil,
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
+
+		// Compose label test
+		{
+			url: "example.com",
+			data: `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
+  <body>
+    <a href="example.net">Example<span>Test</span>Link</a>
+    <img src="example.png" alt="example">
+    <script type="text/javascript" src="example.js">
+  </body>
+</html>`,
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "Example\nLink",
+						Page:  &Page{URL: "example.net"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
+
+		// No label test
+		{
+			url: "example.com",
+			data: `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
+  <body>
+    <a href="example.net"></a>
+    <img src="example.png" alt="example">
+    <script type="text/javascript" src="example.js">
+  </body>
+</html>`,
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "<no label>",
+						Page:  &Page{URL: "example.net"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
 	}
 
 	for _, testItem := range testData {
@@ -124,7 +211,7 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 		}
 
 		if !page.Equal(testItem.expected) {
-			t.Errorf("Unexpected page returned. Expected '%#v' and got '%#v'",
+			t.Errorf("Unexpected page returned. Expected '%s' and got '%s'",
 				testItem.expected, page)
 		}
 	}
@@ -171,6 +258,53 @@ func TestCrawlMustFollowLinks(t *testing.T) {
   </head>
   <body>
     <a href="example.com/link1.html">Link 1</a>
+    <img src="example.png" alt="example"/>
+    <script type="text/javascript" src="example.js"/>
+  </body>
+</html>`,
+				"example.com/link1.html": `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="link1.css">
+  </head>
+  <body>
+    <img src="link1.png" alt="link1"/>
+    <script type="text/javascript" src="link1.js"/>
+  </body>
+</html>`,
+			},
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "Link 1",
+						Page: &Page{
+							URL: "example.com/link1.html",
+							StaticAssets: []string{
+								"link1.css",
+								"link1.png",
+								"link1.js",
+							},
+						},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
+
+		// One level link with partial link
+		{
+			url: "example.com",
+			data: map[string]string{
+				"example.com": `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
+  <body>
+    <a href="/link1.html">Link 1</a>
     <img src="example.png" alt="example"/>
     <script type="text/javascript" src="example.js"/>
   </body>
@@ -329,6 +463,9 @@ func TestCrawlMustFollowLinks(t *testing.T) {
 											{
 												Label:      "Example",
 												CyclicPage: true,
+												Page: &Page{
+													URL: "example.com",
+												},
 											},
 										},
 										StaticAssets: []string{
@@ -366,7 +503,7 @@ func TestCrawlMustFollowLinks(t *testing.T) {
 		}
 
 		if !page.Equal(testItem.expected) {
-			t.Errorf("Unexpected page returned. Expected '%#v' and got '%#v'",
+			t.Errorf("Unexpected page returned. Expected '%s' and got '%s'",
 				testItem.expected, page)
 		}
 	}

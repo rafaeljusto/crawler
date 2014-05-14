@@ -46,7 +46,7 @@ func (p Page) String() string {
 		if link.Page != nil {
 			if link.CyclicPage {
 				// Don't print already visited pages to avoid infinite recursion
-				linkPage = fmt.Sprintf("\n    ❆ %s ↺\n", link.Page.URL)
+				linkPage = fmt.Sprintf("\n    ❆ %s ↺", link.Page.URL)
 
 			} else {
 				// Add an identation level to the link content
@@ -90,9 +90,15 @@ func (p Page) Equal(other Page) bool {
 			return false
 		}
 
-		// Don't check again when the page was already verified
-		if !p.Links[i].CyclicPage && !p.Links[i].Page.Equal(*other.Links[i].Page) {
+		if (p.Links[i].Page == nil && other.Links[i].Page != nil) ||
+			(p.Links[i].Page != nil && other.Links[i].Page == nil) {
 			return false
+
+		} else if p.Links[i].Page != nil && other.Links[i].Page != nil {
+			// Don't check again when the page was already verified
+			if !p.Links[i].CyclicPage && !p.Links[i].Page.Equal(*other.Links[i].Page) {
+				return false
+			}
 		}
 	}
 
