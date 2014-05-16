@@ -577,7 +577,7 @@ func TestCrawlStress(t *testing.T) {
 	domain := fmt.Sprintf("http://%s", httpTestServer.Listener.Addr().String())
 	links := ""
 
-	for i := 0; i < 20000; i++ {
+	for i := 0; i < 8000; i++ {
 		url := fmt.Sprintf("%s/test%d.html", domain, i)
 		links += fmt.Sprintf("<a href=\"%s\">Test %d</a>\n", url, i)
 	}
