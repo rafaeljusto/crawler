@@ -2,12 +2,14 @@
 // Use of this source code is governed by a GPL
 // license that can be found in the LICENSE file.
 
-// crawler verify a HTML page and list the resources
 package crawler
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -491,6 +493,48 @@ func TestCrawlMustFollowLinks(t *testing.T) {
 				},
 			},
 		},
+
+		// Link on subdomain
+		{
+			url: "example.com",
+			data: map[string]string{
+				"example.com": `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="example.css">
+  </head>
+  <body>
+    <a href="test.example.com/link1.html">Link 1</a>
+    <img src="example.png" alt="example"/>
+    <script type="text/javascript" src="example.js"/>
+  </body>
+</html>`,
+				"test.example.com/link1.html": `<html>
+  <head>
+    <link rel="stylesheet" type="text/css" href="link1.css">
+  </head>
+  <body>
+    <img src="link1.png" alt="link1"/>
+    <script type="text/javascript" src="link1.js"/>
+  </body>
+</html>`,
+			},
+			expected: Page{
+				URL: "example.com",
+				Links: []Link{
+					{
+						Label: "Link 1",
+						Page: &Page{
+							URL: "test.example.com/link1.html",
+						},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.png",
+					"example.js",
+				},
+			},
+		},
 	}
 
 	for _, testItem := range testData {
@@ -506,5 +550,42 @@ func TestCrawlMustFollowLinks(t *testing.T) {
 			t.Errorf("Unexpected page returned. Expected '%s' and got '%s'",
 				testItem.expected, page)
 		}
+	}
+}
+
+func TestCrawlStress(t *testing.T) {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	index := ""
+
+	httpTestServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.RequestURI == "/" {
+			fmt.Fprintf(w, index)
+
+		} else {
+			fmt.Fprintf(w, "<html><body></body></html>")
+		}
+	}))
+	defer httpTestServer.Close()
+
+	domain := fmt.Sprintf("http://%s", httpTestServer.Listener.Addr().String())
+	links := ""
+
+	for i := 0; i < 20000; i++ {
+		url := fmt.Sprintf("%s/test%d.html", domain, i)
+		links += fmt.Sprintf("<a href=\"%s\">Test %d</a>\n", url, i)
+	}
+
+	index += fmt.Sprintf("<html><body>%s</body></html>", links)
+
+	if _, err := Crawl(domain, HTTPFetcher{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func BenchmarkCrawl(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		Crawl("example.com", FakeFetcher(func(url string) (io.Reader, error) {
+			return strings.NewReader("<html><body></body></html>"), nil
+		}))
 	}
 }

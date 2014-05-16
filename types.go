@@ -2,7 +2,6 @@
 // Use of this source code is governed by a GPL
 // license that can be found in the LICENSE file.
 
-// crawler verify a HTML page and list the resources
 package crawler
 
 import (

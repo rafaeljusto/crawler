@@ -10,6 +10,25 @@ import (
 	"strings"
 )
 
+const (
+	// Maximum number of running go routines on the a crawl. Got code from
+	// http://golang.org/doc/effective_go.html#channels. This is necessary because we can go
+	// out of descriptors if we start creating go routines with no limit. There's also a
+	// great post about this on http://burke.libbey.me/conserving-file-descriptors-in-go/
+	maxOutstanding = 200
+)
+
+var (
+	// Semaphore to control go routines execution
+	sem = make(chan int, maxOutstanding)
+)
+
+func init() {
+	for i := 0; i < maxOutstanding; i++ {
+		sem <- 1
+	}
+}
+
 // Crawl check all pages of the URL managing go routines
 func Crawl(url string, fetcher Fetcher) (*Page, error) {
 	page := &Page{
@@ -41,7 +60,7 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 // Crawl fetch the URL data and try to retrieve all the information from the page,
 // filling the page pointer on successful return
 func crawlPage(context *CrawlerContext, page *Page) {
-	defer context.WG.Done()
+	<-sem
 
 	context.VisitPage(page)
 
@@ -58,10 +77,13 @@ func crawlPage(context *CrawlerContext, page *Page) {
 	}
 
 	parseHTML(context, root, page)
+
+	sem <- 1
+	context.WG.Done()
 }
 
-// parseHTML is an auxiliary function of Crawl function that will travel recursively around the HTML
-// document identifying elements to populate the Page object
+// parseHTML is an auxiliary function of Crawl function that will travel recursively
+// around the HTML document identifying elements to populate the Page object
 func parseHTML(context *CrawlerContext, node *html.Node, page *Page) {
 	if node.Type == html.ElementNode {
 		switch node.Data {

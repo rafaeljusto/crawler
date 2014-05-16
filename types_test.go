@@ -2,7 +2,6 @@
 // Use of this source code is governed by a GPL
 // license that can be found in the LICENSE file.
 
-// crawler verify a HTML page and list the resources
 package crawler
 
 import (
@@ -556,5 +555,30 @@ func TestHTTPFetcher(t *testing.T) {
 	page, err = Crawl("http://unknownurl.unknown", HTTPFetcher{})
 	if err == nil {
 		t.Error("Not detecting HTTP fetcher errors")
+	}
+}
+
+func BenchmarkPageToString(b *testing.B) {
+	page := Page{
+		URL: "index.html",
+		Links: []Link{
+			{
+				Label: "Example 1",
+				Page:  &Page{URL: "example1.html"},
+			},
+			{
+				Label: "Example 2",
+				Page:  &Page{URL: "example2.html"},
+			},
+		},
+		StaticAssets: []string{
+			"example.css",
+			"example.js",
+			"example.png",
+		},
+	}
+
+	for n := 0; n < b.N; n++ {
+		page.String()
 	}
 }
