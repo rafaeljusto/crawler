@@ -219,27 +219,34 @@ func TestCrawlMustReturnPageWithInformation(t *testing.T) {
 	}
 }
 
-func TestCrawlMustReturnErrorOnFetchProblems(t *testing.T) {
+func TestCrawlMustReturnFailPageOnFetchProblems(t *testing.T) {
 	testData := []struct {
 		url      string
 		data     string
-		expected error
+		expected Page
 	}{
 		{
-			url:      "example.com",
-			data:     "",
-			expected: http.ErrContentLength,
+			url:  "example.com",
+			data: "",
+			expected: Page{
+				URL:  "example.com",
+				Fail: true,
+			},
 		},
 	}
 
 	for _, testItem := range testData {
-		_, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
+		page, err := Crawl(testItem.url, FakeFetcher(func(url string) (io.Reader, error) {
 			return strings.NewReader(testItem.data), http.ErrContentLength
 		}))
 
-		if testItem.expected != err {
-			t.Fatalf("Unexpected error returned. Expected '%v' and got '%v'",
-				testItem.expected, err)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !testItem.expected.Equal(*page) {
+			t.Fatalf("Unexpected error returned. Expected '%s' and got '%s'",
+				testItem.expected, page)
 		}
 	}
 }

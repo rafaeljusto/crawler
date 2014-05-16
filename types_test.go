@@ -98,6 +98,47 @@ func TestPageString(t *testing.T) {
     
 `,
 		},
+
+		// Page with invalid links test
+		{
+			page: Page{
+				URL: "index.html",
+				Links: []Link{
+					{
+						Label: "Example 1",
+						Page: &Page{
+							URL:  "example1.html",
+							Fail: true,
+						},
+					},
+					{
+						Label: "Example 2",
+						Page:  &Page{URL: "example2.html"},
+					},
+				},
+				StaticAssets: []string{
+					"example.css",
+					"example.js",
+					"example.png",
+				},
+			},
+			expected: `
+❆ index.html
+
+  ▤  example.css
+  ▤  example.js
+  ▤  example.png
+
+  ↳ "Example 1"
+  
+    ❆ example1.html ✗
+    
+  ↳ "Example 2"
+  
+    ❆ example2.html
+    
+`,
+		},
 	}
 
 	for _, testItem := range testData {
@@ -553,8 +594,11 @@ func TestHTTPFetcher(t *testing.T) {
 	})
 
 	page, err = Crawl("http://unknownurl.unknown", HTTPFetcher{})
-	if err == nil {
-		t.Error("Not detecting HTTP fetcher errors")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !page.Fail {
+		t.Error("Fail flag not defined on invalid URL")
 	}
 }
 

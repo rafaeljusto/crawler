@@ -59,6 +59,7 @@ func main() {
 ┃ ↳ Link               ┃
 ┃ ▤ Static Asset       ┃
 ┃ ↺ Already visited    ┃
+┃ ✗ Fail to download   ┃
 ┃                      ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━┛
 

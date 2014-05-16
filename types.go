@@ -18,6 +18,7 @@ import (
 // Page describes the information stored after a webpage is crawled
 type Page struct {
 	URL          string   // Address of the page
+	Fail         bool     // Flag to indicate that the system failed to access the URL
 	Links        []Link   // List of links for other URLs in this page
 	StaticAssets []string // List of static dependencies of this page
 }
@@ -57,7 +58,12 @@ func (p Page) String() string {
   %s`, link.Label, linkPage)
 	}
 
-	pageStr := fmt.Sprintf("\n❆ %s\n", p.URL)
+	pageStr := ""
+	if p.Fail {
+		pageStr = fmt.Sprintf("\n❆ %s ✗\n", p.URL)
+	} else {
+		pageStr = fmt.Sprintf("\n❆ %s\n", p.URL)
+	}
 
 	// Don't add unecessary spaces when there's no information
 	if len(staticAssets) > 0 {
@@ -141,7 +147,6 @@ type CrawlerContext struct {
 	Domain  string
 	Fetcher Fetcher
 	WG      sync.WaitGroup
-	Fail    chan error
 
 	// visitedPages store all pages already visited in a map, so that if we found a link for the same
 	// page again, we just pick on the map the same object address. The function that prints the page
@@ -159,7 +164,6 @@ func NewCrawlerContext(domain string, fetcher Fetcher) *CrawlerContext {
 		Fetcher: fetcher,
 	}
 
-	c.Fail = make(chan error)
 	c.visitedPages = make(map[string]*Page)
 	return c
 }

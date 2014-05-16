@@ -39,20 +39,7 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 
 	context.WG.Add(1)
 	go crawlPage(context, page)
-
-	done := make(chan bool)
-	go func() {
-		context.WG.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Everything worked fine
-
-	case err := <-context.Fail:
-		return nil, err
-	}
+	context.WG.Wait()
 
 	return page, nil
 }
@@ -62,24 +49,26 @@ func Crawl(url string, fetcher Fetcher) (*Page, error) {
 func crawlPage(context *CrawlerContext, page *Page) {
 	<-sem
 
+	defer func() {
+		sem <- 1
+		context.WG.Done()
+	}()
+
 	context.VisitPage(page)
 
 	r, err := context.Fetcher.Fetch(page.URL)
 	if err != nil {
-		context.Fail <- err
+		page.Fail = true
 		return
 	}
 
 	root, err := html.Parse(r)
 	if err != nil {
-		context.Fail <- err
+		page.Fail = true
 		return
 	}
 
 	parseHTML(context, root, page)
-
-	sem <- 1
-	context.WG.Done()
 }
 
 // parseHTML is an auxiliary function of Crawl function that will travel recursively
