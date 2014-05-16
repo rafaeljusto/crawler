@@ -25,6 +25,11 @@ Also, to easy run the project tests you will need the following:
 
 * Python3 - http://www.python.org/
 
+Finally, to download and build the command line tool just use the following commands:
+
+    go get -u github.com/rafaeljusto/crawler
+    go build -o crawler github.com/rafaeljusto/crawler/app
+
 deploying
 =========
 
